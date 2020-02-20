@@ -1,0 +1,134 @@
+---
+title: "Exercise 1"
+author: Niclas Simmler
+date: 20.02.20
+output: html_notebook
+---
+
+# Exercise 1.1
+What is the expected period (time period of repetition) and the time step for the following timeseries:
+
+a) Sunshine duration per month in Basel from 1990 to 2000.
+**Monthly**
+a) Number of newborn babies in the city of Zurich per year from 2000 to 2011.
+**Annualy**
+a) Number of reservations in a restaurant for every night during 4 weeks.
+**Daily**
+a) Water runoff of a river. The data has been collected every day for 4 years.
+**Daily**
+
+# Exercise 1.2
+
+Using the data hstart.dat, we illustrate various methods for descriptive decomposition and elimination of trends. The data contains monthly data on the start of residential construction in the USA within the time frame of January 1966 to December 1974. The data have undergone some transformation unknown to us (perhaps an index over some baseline value has been calculated, or perhaps the data are to be read as x · 10? construction permits).
+
+Make a time series plot. Is this a stationary time series? If not, what kind of non- stationarity is evident?
+
+```{r}
+start <- read.table("hstart.dat")
+ts.obj <- ts(start, start = c(1966,1), freq = 12)
+plot(ts.obj, ylab = 'Count', main = 'Start of residential construction in the USA')
+```
+It seems that there is an annual seasonal component present. There is a peak during summer and a low during winter.
+
+# Exercise 1.3
+Simulate timeseries according to the following models:
+a) Y1: Yt = Et−0.5·Et−1 ,where Et ∼N(0,1) i.i.d. E0 = 0
+
+```{r}
+# Define random seed
+set.seed(42)
+# Create Random Walker
+Et <- ts(rnorm(101, 0, 1))
+# Set Anchor
+Et[1] <- 0
+# Initialize y1
+y1 <- 0
+
+# Draw a point from Et
+for (i in 2:length(Et)) {
+    # Simulate change
+    y1[i] <- Et[i] - 0.5 * Et[i-1]
+}
+# Skip 0 we defined earlier
+y1 = y1[2:length(y1)]
+# Create TS Obj
+ts.y1 = ts(y1)
+plot(ts.y1)
+```
+This timeseries seems to be stationary, since it is more or less evenly distributed around 0.
+
+b) Y2: Yt =Yt−1+Et ,where Et ∼N(0,1) i.i.d.Y0 =0
+
+```{r}
+# Define random seed
+set.seed(42)
+# Create Random Walker
+Et <- ts(rnorm(101, 0, 1))
+# Set Anchor
+Et[1] <- 0
+# Initialize y1
+y1 <- 0
+
+# Draw a point from Et
+for (i in 2:length(Et)) {
+    # Simulate change
+    y1[i] <- y1[i-1] + Et[i]
+}
+# Skip 0 we defined earlier
+y1 = y1[2:length(y1)]
+# Create TS Obj
+ts.y1 = ts(y1)
+plot(ts.y1)
+```
+This timeseries seems not to be stationary.
+
+c) Y3: Yt =0.5·Yt−1+Et ,where Et ∼N(0,1) i.i.d.Y0 =0
+
+```{r}
+# Define random seed
+set.seed(42)
+# Create Random Walker
+Et <- ts(rnorm(101, 0, 1))
+# Set Anchor
+Et[1] <- 0
+# Initialize y1
+y1 <- 0
+
+# Draw a point from Et
+for (i in 2:length(Et)) {
+    # Simulate change
+    y1[i] <- 0.5*y1[i-1] + Et[i]
+}
+# Skip 0 we defined earlier
+y1 = y1[2:length(y1)]
+# Create TS Obj
+ts.y1 = ts(y1)
+plot(ts.y1)
+```
+This timeseries seems to be stationary.
+
+d) Y4: Yt =Yt−1·Et ,where Et ∼U(0.95,1.05) i.i.d.Y0 =1
+
+
+```{r}
+# Define random seed
+set.seed(42)
+# Create Random Walker
+Et <- ts(rnorm(101, 0.95, 1.05))
+# Set Anchor
+Et[1] <- 0
+# Initialize y1
+y1 <- 1
+
+# Draw a point from Et
+for (i in 2:length(Et)) {
+    # Simulate change
+    y1[i] <- y1[i-1] * Et[i]
+}
+# Skip 0 we defined earlier
+y1 = y1[2:length(y1)]
+# Create TS Obj
+ts.y1 = ts(y1)
+plot(ts.y1)
+```
+This timeseries seems not to be stationary.
