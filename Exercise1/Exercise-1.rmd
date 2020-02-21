@@ -55,7 +55,7 @@ y1 = y1[2:length(y1)]
 ts.y1 = ts(y1)
 plot(ts.y1)
 ```
-This timeseries seems to be stationary, since it is more or less evenly distributed around 0.
+This timeseries seems to be stationary, since it is more or less evenly distributed around 0 (mean) and has a somewhat equal variance across time.
 
 b) Y2: Yt =Yt−1+Et ,where Et ∼N(0,1) i.i.d.Y0 =0
 
@@ -80,7 +80,7 @@ y1 = y1[2:length(y1)]
 ts.y1 = ts(y1)
 plot(ts.y1)
 ```
-This timeseries seems not to be stationary.
+This timeseries seems not to be stationary as there is a varying variance across time.
 
 c) Y3: Yt =0.5·Yt−1+Et ,where Et ∼N(0,1) i.i.d.Y0 =0
 
@@ -105,7 +105,7 @@ y1 = y1[2:length(y1)]
 ts.y1 = ts(y1)
 plot(ts.y1)
 ```
-This timeseries seems to be stationary.
+This timeseries seems not to be stationary as there is a varying variance across time.
 
 d) Y4: Yt =Yt−1·Et ,where Et ∼U(0.95,1.05) i.i.d.Y0 =1
 
@@ -131,4 +131,4 @@ y1 = y1[2:length(y1)]
 ts.y1 = ts(y1)
 plot(ts.y1)
 ```
-This timeseries seems not to be stationary.
+This timeseries seems not to be stationary as there is a varying variance across time.
