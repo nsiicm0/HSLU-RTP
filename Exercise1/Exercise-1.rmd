@@ -114,7 +114,7 @@ d) Y4: Yt =Yt−1·Et ,where Et ∼U(0.95,1.05) i.i.d.Y0 =1
 # Define random seed
 set.seed(42)
 # Create Random Walker
-Et <- ts(rnorm(101, 0.95, 1.05))
+Et <- ts(runif(101, 0.95, 1.05))
 # Set Anchor
 Et[1] <- 0
 # Initialize y1
