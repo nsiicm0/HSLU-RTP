@@ -24,7 +24,7 @@ Using the data hstart.dat, we illustrate various methods for descriptive decompo
 Make a time series plot. Is this a stationary time series? If not, what kind of non- stationarity is evident?
 
 ```{r}
-start <- read.table("hstart.dat")
+start <- read.table('http://stat.ethz.ch/Teaching/Datasets/WBL/hstart.dat')
 ts.obj <- ts(start, start = c(1966,1), freq = 12)
 plot(ts.obj, ylab = 'Count', main = 'Start of residential construction in the USA')
 ```
