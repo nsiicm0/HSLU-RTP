@@ -1,0 +1,117 @@
+---
+title: "Exercise 2"
+author: Niclas Simmler
+date: 20.02.20
+output: html_notebook
+---
+
+# Exercise 2.1
+Remove the linear trend by applying backward differencing on timeseries created from the following models:
+a) Xt ∼0.5t+1+Ut where Ut ∼U(−1,1)
+Plot the results. Also compare the length of the different time series and transformations.
+```{r}
+set.seed(42)
+t <- seq(1, 100, length = 100)
+data <- 0.5 * t + 1 + runif(100, -1, 1)
+ts <- ts(data)
+
+par(mfrow=c(2,1))
+plot(ts, main='Original TS')
+diff.ts <- diff(ts)
+plot(diff.ts, main='Diffed TS')
+cat('Length original TS: ', length(ts), '| Length diffed TS:', length(diff.ts), '\n')
+```
+So the diffed TS object is now shorter by 1 timestep (because we used lag one), since the first element does not have a predecessor element.
+
+
+b) Xt ∼2t2+3t−1+Ut whereUt ∼U(−200,200)
+Plot the results. Also compare the length of the different time series and transformations.
+```{r}
+set.seed(42)
+t <- seq(1, 100, length = 100)
+data <- 2 * t ^ 2 + 3 * t - 1 + runif(100, -200, 200)
+ts <- ts(data)
+
+par(mfrow=c(2,1))
+plot(ts, main='Original TS')
+diff.ts <- diff(ts)
+plot(diff.ts, main='Diffed TS')
+cat('Length original TS: ', length(ts), '| Length diffed TS:', length(diff.ts), '\n')
+```
+Again, the diffed TS object is now shorter by 1 timestep (because we used lag one), since the first element does not have a predecessor element.
+
+# Exercise 2.2
+
+We reconsider the data set from exercise 1.2 about residential construction in the USA from January 1966 to December 1974.
+```{r}
+data <- read.table('http://stat.ethz.ch/Teaching/Datasets/WBL/hstart.dat')
+data.ts <- ts(data$V1, start = c(1966,1), freq = 12)
+```
+## a)
+Decompose the time series in trend, seasonal component and remainder using the non-parametric STL method, and plot the results.
+```{r}
+data.stl <- stl(data.ts, t.window = 12, s.window = 'periodic')
+plot(data.stl)
+```
+## b)
+The special filter Yt = (1/24)*(Xt−6 +2Xt-5 +...+2Xt +...+Xt+6) can be used for computing a trend estimate. Plot this, the STL trend and the data in a single plot. What are the differences between the two methods?
+
+```{r}
+weights <- rep(c(1,2),6)/12
+trend.filtered <- filter(data.ts, filter = weights, sides = 2)
+trend.stl <- data.stl$time.series[,'trend']
+par(mfrow=c(3,1))
+plot(data.ts, main='Data', ylab='')
+plot(trend.filtered, main = 'Filtered Trend', ylab='')
+plot(trend.stl, main='STL Trend', ylab='')
+```
+The filtered line is obviously shorter, as we are using quite a lot of elements for the filter. STL seems to make up for the lost timesteps. Above all, the STL method returns a smoother line.
+
+## c)
+Try to remove the trend and seasonal effects by computing differences. After removing seasonal effects, choose some linear trend elimination method and plot the outcome.
+```{r}
+# remove seasonality
+data.ts.no.seasonality <- diff(data.ts, lag=12)
+
+# linear trend eliminiation
+data.ts.no.trend.no.seasonality <- diff(data.ts.no.seasonality) # here we could also be using a different method such as lm or smoothing
+plot(data.ts.no.trend.no.seasonality, main='Noise Remainder')
+
+```
+The second diff is obviously the easiest method that I could have chosen. I could have also opted for a linear regression model or smoothing to remove the trend.
+
+# Exercise 2.3
+To test ideas and algorithms, R comes with built-in data sets. The data used in this exercise is called co2 and contains atmospheric concentrations of CO2 in parts per million. In the R-hints below is shown how to load the data into R.
+Use backward differencing on the co2 data to abolish the seasonality effect. Figure out what value for the lag is to choose for an optimum reduction of the seasonality? What happens if you choose other values for the lag?
+
+```{r}
+data(co2)
+plot(co2, main = 'co2 data')
+co2.diff <- diff(co2,12)
+plot(co2.diff)
+```
+I have chosen lag 12 since these are monthly data points over multiple years. (12 months per year). If we would use a different lag, we would still keep the seasonality, which would be present in the acf plots (periodic oscillation).
+
+# Exercise 2.4
+Once again have a look at the co2 data set. In this exercise you should try to decompose the series into trend, seasonality and random parts using a linear additive filter. For the seasonal part, the hints below should help you calculate the means over the same months in different years.
+
+
+```{r, fig.height=8}
+co2.ts <- ts(co2, start = c(1959,1), freq = 12)
+
+weights <- c(.5,rep(1,11),.5)/12 # making sure we get a full period
+trend.ts <- filter(co2.ts, filter = weights, sides = 2)
+
+month <- factor(rep(1:12, 39))
+seasn.est <- tapply(co2.ts, month, mean, na.rm = TRUE)
+season.ts <- rep(seasn.est, length(co2.ts)/length(seasn.est))
+
+noise.ts <- co2.ts - trend.ts - season.ts
+
+par(mfrow=c(4,1))
+plot(co2.ts, col='blue', main='CO2 Timeseries')
+plot(season.ts, type='l', col='green', main='Seasonality Estimate')
+plot(trend.ts, type='l', col='red', main='Trend Estimate')
+plot(noise.ts, type='l', col='yellow', main='Noise Estimate')
+
+```
