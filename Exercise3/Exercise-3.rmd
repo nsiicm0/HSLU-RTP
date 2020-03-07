@@ -1,0 +1,149 @@
+---
+title: "Exercise 3"
+author: Niclas Simmler
+date: 05.03.20
+output: html_notebook
+---
+
+# Exercise 3.1
+```{r,warning = FALSE, message = FALSE}
+library(fma)
+```
+Below you find the plots and the correlograms of four datasets. The correlograms have been permutated.
+Please find for each data sets (A-D) the appropriate corellogram (1 - 4).
+
+* B maps to 3 because it has a positive trend and a clear seasonality. The positive trend (non-stationary) makes it slowly decay in the correlogram. The seasonality makes the correlogram oscilate.
+```{r, fig.height=8}
+par(mfrow=c(2,1))
+plot(AirPassengers)
+acf(AirPassengers, type='correlation', main='')
+```
+
+* C maps to 1 because it has a somewhat clear seasonality. This means the correlogram oscilates and expresses a cosine curve. The period in C lasts for ~5 years, which is reflected as a lag of 5 in the correlogram.
+```{r, fig.height=8}
+par(mfrow=c(2,1))
+plot(mink)
+acf(mink, type='correlation', main='')
+```
+
+* D maps to 4 because it has a somewhat clear seasonality. This means the correlogram oscilates and expresses a cosine curve. The period in D lasts for half a year, which is reflected as a lag of 0.5 in the correlogram.
+```{r, fig.height=8}
+par(mfrow=c(2,1))
+plot(usdeaths)
+acf(usdeaths, type='correlation', main='')
+```
+
+* A maps to 2 because it is almost stationary and does not show clear seasonality. This means the correlogram quickly decays and there is almost no oscilation in the correlogram.
+```{r, fig.height=8}
+par(mfrow=c(2,1))
+plot(cowtemp)
+acf(cowtemp, type='correlation', main='')
+```
+
+# Exercise 3.2
+Let us now consider the electricity production of Australia in GWh in the period from January 1958 to December 1990. You may download the data from
+```{r,warning = FALSE, message = FALSE}
+data.electricity <- read.table('http://stat.ethz.ch/Teaching/Datasets/WBL/cbe.dat')
+```
+The aim of this exercise is to compare the effect of different algorithms to decompose a time series representation in trend, seasonality and remainder by means of their (partial) autocorrelation function.
+
+## a)
+Start by considering the plot of the time series. Why is not meaningful to interpret the correlogram of this time series?
+Explain in a few sentences.
+```{r,warning = FALSE, message = FALSE}
+plot(data.electricity, type='l')
+```
+The data is obviously not stationary. Hence, there will not be a fast decay in the correlogram and thus, the correlogram will not be meaningful. It looks like the data also contains some sort of seasonality, thus the correlogram will also oscilate slightly.
+
+## b)
+Decompose the timeseries into trend,seasonal component and remainder using the R function decompose(), which performs the decomposition with moving averages. Plot the remainder and its correlogram and interpret the plots in a few sentences.
+
+```{r,warning = FALSE, message = FALSE}
+ts.electricity <- ts(data.electricity$elec, start=1956, freq=12)
+ts.electricity.decomp <- decompose(ts.electricity, type = "multiplicative")
+par(mfrow=c(2,1))
+plot(ts.electricity.decomp$random)
+acf(ts.electricity.decomp$random, type='correlation', na.action = na.pass, plot = TRUE, main='')
+```
+The remainder looks like noise obviously, which is to be expected from a decomposition. However, the correlogram still expresses a behavior as it would when seasonality is still present (oscilating cosine curve). This is somewhat odd, as all seasonality should have been extracted already in the decomposition.
+
+## c)
+Decompose the log-transformed time series using the R function stl(). Estimate the seasonal effect once by averaging over all years (parameter s.window= "periodic") and once by choosing an appropriate smoothing window (parameter s.window = ...). Recall that the window length has to be odd. An appropriate smoothing window may be determined by the R-function monthplot(). For both estimation approaches (averaging and smoothing window), plot the remainder and its correlogram, and comment on the plots.
+```{r,warning = FALSE, message = FALSE}
+ts.electricity.stl <- stl(log(ts.electricity), s.window = 'periodic')
+plot(ts.electricity.stl)
+```
+```{r,warning = FALSE, message = FALSE}
+ts.electricity.stl.s <- stl(log(ts.electricity), s.window = 13)
+monthplot(ts.electricity.stl.s, s.window=13)
+```
+The s.window parameter 13 gives a smooth output in the monthplot. When comparing with other values, it showed more jitter in the lines.
+```{r,warning = FALSE, message = FALSE}
+par(mfrow=c(2,2))
+plot(ts.electricity.stl$time.series[,'remainder'], main='Periodic Remainder')
+plot(ts.electricity.stl.s$time.series[,'remainder'], main='s.window=13 Remainder')
+acf(ts.electricity.stl$time.series[,'remainder'], na.action = na.pass, plot = TRUE, main='')
+acf(ts.electricity.stl.s$time.series[,'remainder'], na.action = na.pass, plot = TRUE, main='')
+```
+When using "periodic" as parameter for s.window (left side of above plot), we will get a correlogram for the remainder, which still expresses behavior of a seasonal pattern in the data. The pattern expresses multiple occasions in which the correlation seems to be significant in higher lags. When using a numeric s.window parameter, then these seasonal patterns are still somewhat present, but almost never express significance.
+
+## d)
+Explain why you used the parameter type = "multiplicative" in Task b), and why you log-transformed the time series before performing an stl() decomposition in Task c).
+
+The type multiplicative has been used since the time series did not express a linear trend (which would be additive in type). Since the data contains polynomial characteristics, we needed to log transform the data to convert it to linear data.
+
+## e)
+As a last algorithm consider the differencing approach. Choose a lag of 1 and 12 (months) to eliminate a trend and periodic structures. Plot the resulting time series and autocorrelation function. Compare the results to the previous methods.
+
+```{r,warning = FALSE, message = FALSE}
+par(mfrow=c(2,1))
+ts.electricity.diff <- diff(diff(ts.electricity,1),12) # removing trend and seasonality.
+plot(ts.electricity.diff, main='')
+acf(ts.electricity.diff, na.action = na.pass, plot = TRUE, main='')
+```
+The resulting correlogram only expresses some correlation in the seocond timestep (and somewhere further down the road). So the result is comparable in quality to the s.window numeric parameter version. For the stl version however, we did not have a correlation in the second timestep. A big issue with the diff version is that we lose a lot of information from the timeseries, since it gets smoothed quite a lot. The stl method retains a lot more information.
+
+# Exercise 3.3
+In this exercise, we will calculate the lagged scatter plot and the plug-in estimator without employing the internal R function.
+
+## a)
+Write a function to calculate the lagged scatter plot estimator for the autocorrelation. For this, you may extend the code given in the lecture notes.
+```{r,warning = FALSE, message = FALSE}
+lagged.estimator <- function(dataset){
+    n <- length(dataset)
+    lagCorrel <- rep(0,n)
+    for (i in 1:(n-1)){
+      lagCorrel[i]<-cor(dataset[1:(n-i)],dataset[(i+1):n])
+    }
+    return(lagCorrel)
+}
+```
+## b)
+Develop a function to calculate the plug-in estimator for the autocorrelation.
+```{r,warning = FALSE, message = FALSE}
+autocorrelation.estimator <- function(dataset){
+    n <- length(dataset)
+    lagCorrel <- rep(0,n)
+    for (i in 1:(n-1)){
+      lagCorrel[i]<-cov(dataset[1:(n-i)],dataset[(i+1):n])/var(dataset[1:(n-i)])
+    }
+    return(lagCorrel)
+}
+```
+## c)
+Calculate the two estimates for the beer and the chicken dataset. The beer and the chicken dataset is contained in the "fma"package. In case it is not al- ready loaded, one can load it with the command library(fma).
+```{r,warning = FALSE, message = FALSE}
+estimate <- function(dataset, name=''){
+  plot(lagged.estimator(dataset), main = name, pch=20, type='lines', col='blue', ylab='')
+  lines(autocorrelation.estimator(dataset), pch='20', col='red')
+  legend('bottomleft',legend=c("Lagged Scatter Plot Estimator", "Plug-In Autocorrelation Estimator"), col=c("blue", "red"),lty=c(1,1))
+}
+```
+### Beer
+```{r,warning = FALSE, message = FALSE}
+estimate(beer, 'Beer')
+```
+### Chicken
+```{r,warning = FALSE, message = FALSE}
+estimate(chicken, 'Chicken')
+```
