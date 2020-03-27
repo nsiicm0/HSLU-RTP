@@ -1,0 +1,129 @@
+---
+title: "Exercise 5"
+author: Niclas Simmler
+date: 27.03.20
+output: html_notebook
+---
+
+# Exercise 5.1
+Simulations are key to validate models. Thus, we would like to use this exercise to simulate several time series by means of an ARMA model.
+
+## a) & b)
+AR(2) model with coefficients $\alpha_1 = 0.9$ and $\alpha_2 = −0.5$.
+MA(3) model with coefficients $\beta_1 = 0.8$, $\beta_2 = −0.5$ and $\beta_3 = −0.4$.
+```{r}
+sim.coef.a <- c(0.9, -0.5)
+sim.coef.b <- c(0.8, -0.5, -0.4)
+```
+
+### i)
+First think of how the autocorrelations should behave theoretically.
+
+a) Fast (almost exponential) decay in ACF and PACF only has lag 1 and 2 differ from 0 (AR(2) model).
+b) ACF: ?, PACF lags 1 to 3 should differ from 0 (AR(3) model).
+
+### ii)
+Use the procedure ARMAacf() to compute the theoretical autocorrelations of the models and plot them.
+
+```{r}
+par(mfrow=c(2,2))
+plot(0:30, ARMAacf(ar = sim.coef.a, lag.max = 30), type = "h", ylab = "ACF", main = 'a) ACF')
+plot(1:30, ARMAacf(ar = sim.coef.a, lag.max = 30, pacf = TRUE), type = "h", ylab = "PACF", main = 'a) PACF')
+plot(0:30, ARMAacf(ma = sim.coef.b, lag.max = 30), type = "h", ylab = "ACF", main = 'b) ACF')
+plot(1:30, ARMAacf(ma = sim.coef.b, lag.max = 30, pacf = TRUE), type = "h", ylab = "PACF", main = 'b) PACF')
+
+```
+a) Interestingly, the ACF suggests some seasonality (damped sigmoid) in the data.
+b) The PACF shows correlation past lag 3.
+
+
+## iii)
+
+Now simulate a realisation of length $n = 200$ for the models a) - c). Repeat each simulation several times to develop some intuition on what occurs by chance and what is structure.
+
+```{r}
+sim.data.a <- arima.sim(list(ar=sim.coef.a), n=200)
+sim.data.b <- arima.sim(list(ma=sim.coef.b), n=200)
+```
+
+## iv)
+Inspect the time series plot and the correlograms with the ordinary and partial autocorrelations.
+
+```{r}
+library(forecast)
+tsdisplay(sim.data.a)
+tsdisplay(sim.data.b)
+```
+a) There is no obvious structure visible in the timeseries. The ACF plot suggests that the timeseries is NOT i.i.d (no random behavior).
+b) There is no obvious structure visible in the timeseries. The ACF plot suggests that the timeseries is NOT i.i.d (no random behavior).
+
+# Exercise 5.2
+In this exercise we consider some examples of AR(p) models and check their stationarity.
+
+## a)
+Test the models
+
+i) $X_t = 0.5X_{t-1} + 2X_{t-2} + \epsilon_t$
+
+ii) $Y_t = Y_{t-1} + \epsilon_t$
+
+with the innovation Et on stationarity with the help of the R function polyroot.
+
+*i)*
+Find Characteristic Polynom:
+
+$\rightarrow X_t - 0.5X_{t-1} - 2X_{t-2} = \epsilon_t$
+
+$\rightarrow (1 - 0.5B - 2B) X_t = \epsilon_t$
+
+$\rightarrow \Phi(Z) = 1 - 0.5Z -2Z$
+
+```{r}
+coefs.i <- c(1, -0.5, -2)
+abs(polyroot(coefs.i))
+```
+All absolute values of the coefficients are below 1, hence the timeseries is *not* stationary.
+
+
+*ii)*
+Find Characteristic Polynom:
+
+$\rightarrow Y_t - Y_{t-1} = \epsilon_t$
+
+$\rightarrow (1 - B) Y_t = \epsilon_t$
+
+$\rightarrow \Phi(Z) = 1 - Z$
+
+```{r}
+coefs.ii <- c(1, -1)
+abs(polyroot(coefs.ii))
+```
+There is no coefficient strictly greater than 1, hence the timeseries is *not* stationary.
+
+## b)
+For which value of the coefficient $\alpha_2$ of $X_{t−2}$ is the model $X_t = 0.5X_{t-1} + \alpha X_{t-2} + \epsilon_t$ stationary?
+```{r, warning = FALSE}
+alphas <- c()
+counter <- 1
+for(alpha in -100:100){
+  if(abs(polyroot(c(1,0.5,-((alpha/10))))) > 1){
+    alphas[counter] <- (alpha/10)
+    counter <- counter + 1
+  }
+}
+alphas
+```
+The timeseries process seems to be stationary for an $\alpha \in [-0.9, 1.4]$. The test was conducted with $\alpha$ ranging from $[-10,10]$ in steps of size $0.1$.
+
+## c)
+Why is the model $Y_t = \alpha Y_{t−1} + E_t$ not stationary for $\ |\alpha| \ge 1$? Calculate the characteristic function and determine its roots to confirm this observation.
+
+The bigger the $\alpha$ the bigger the dependence on the previous timeseries step. This means stationarity cannot be achieved since timeseries steps should be as independent as possible.
+```{r}
+polyroots <- c()
+for(alpha in 1:10){
+  polyroots[alpha] <- abs(polyroot(c(1,-alpha)))
+}
+polyroots
+```
+The polyroots show, that the bigger $\alpha$ becomes, the smaller the root becomes (further away from 1). Hence, stationarity-likelyhood decreases.
