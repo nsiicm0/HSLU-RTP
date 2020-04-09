@@ -1,0 +1,179 @@
+---
+title: "Exercise 7"
+author: Niclas Simmler
+date: 09.04.20
+output: html_notebook
+---
+```{r include=FALSE}
+library(forecast)
+```
+
+# Exercise 7.1
+Similar to exercise 5.1, we start with some simulations. Thus, we would like to use this exercise to simulate several time series by means of an ARMA model. Please perform the same steps as in exercise 5.1 for the following models:
+
+The innovation $E_t$ shall follow a standard normal distribution $\mathcal{N}(0; 1)$ in every model.
+
+## a)
+$ARMA(1,2)$ model with coefficients $\alpha_1 = −0.75$, $\beta_1 = −0.3$ and $\beta_2 = 0.25$.
+```{r}
+sim.a.coef.ar <- c(-0.75)
+sim.a.coef.ma <- c(-0.3,0.25)
+```
+
+### i.
+First think of how the autocorrelations should behave theoretically.
+
+We should see a cutoff in the ACF plot for lag 2 and a cutoff in the PACF plot for lag 1.
+
+### ii.
+Use the procedure ARMAacf() to compute the theoretical autocorrelations of the models and plot them.
+```{r}
+par(mfrow=c(1,2))
+plot(0:30, ARMAacf(ar = sim.a.coef.ar, ma = sim.a.coef.ma, lag.max = 30), type = "h", ylab = "ACF", main = 'ACF')
+plot(1:30, ARMAacf(ar = sim.a.coef.ar, ma = sim.a.coef.ma, lag.max = 30, pacf = TRUE), type = "h", ylab = "PACF", main = 'PACF')
+```
+We can see a clear drop in the PACF plot as predicted after lag 1 (representing the AR part of the model). However, we cannot clearly tell a drop in the ACF plot for the MA behavior.
+
+### iii.
+Now simulate a realisation of length n=200 for the model. Repeat each simulation several times to develop some intuition on what occurs by chance and what is structure.
+```{r}
+set.seed(42)
+sim.a.data <- arima.sim(list(ar = sim.a.coef.ar, ma = sim.a.coef.ma), n=200)
+```
+### iv.
+Inspect the time series plot and the correlograms with the ordinary and partial autocorrelations.
+```{r}
+tsdisplay(sim.a.data)
+```
+The timeseries plot does not suggest any structure, hence we are looking at white noise here probably. Again, we can tell a strong drop in the PACF plot but only a damped sinusoid behavior in the ACF plot.
+
+## b)
+$ARMA(2,1)$ model with coefficients $\alpha_1 = 0.5$, $\alpha_2 = -0.3$ and $\beta_1 = 0.25$.
+```{r}
+sim.b.coef.ar <- c(0.5,-0.3)
+sim.b.coef.ma <- c(0.25)
+```
+
+### i.
+First think of how the autocorrelations should behave theoretically.
+
+We should see a cutoff in the ACF plot for lag 1 and a cutoff in the PACF plot for lag 2.
+
+### ii.
+Use the procedure ARMAacf() to compute the theoretical autocorrelations of the models and plot them.
+```{r}
+par(mfrow=c(1,2))
+plot(0:30, ARMAacf(ar = sim.b.coef.ar, ma = sim.b.coef.ma, lag.max = 30), type = "h", ylab = "ACF", main = 'ACF')
+plot(1:30, ARMAacf(ar = sim.b.coef.ar, ma = sim.b.coef.ma, lag.max = 30, pacf = TRUE), type = "h", ylab = "PACF", main = 'PACF')
+```
+We can see a clear drop in the PACF plot as predicted after lag 2 (representing the AR part of the model). This time we can also see a strong drop after lag 1 (index 2 to 3 due to the nature of the plot).
+
+### iii.
+Now simulate a realisation of length n=200 for the model. Repeat each simulation several times to develop some intuition on what occurs by chance and what is structure.
+```{r}
+set.seed(42)
+sim.b.data <- arima.sim(list(ar = sim.b.coef.ar, ma = sim.b.coef.ma), n=200)
+```
+### iv.
+Inspect the time series plot and the correlograms with the ordinary and partial autocorrelations.
+```{r}
+tsdisplay(sim.b.data)
+```
+Again, we can tell in both plots (ACF and PACF) the predicted drops in the lags.
+
+# Exercise 7.2
+In this exercise, we look at the time series sunspotarea, which is available in the packa- ge fpp. It contains yearly data about the area of sunspots averaged over all days of the year (in units of millionths of a hemisphere). Sunspots are magnetic regions that appear as dark spots on the surface of the sun.
+```{r include=FALSE}
+library(fpp)
+```
+
+## a)
+Plot the time series. Why does it make sense to log-transform the time series?
+```{r}
+par(mfrow=c(1,2))
+plot(sunspotarea)
+hist(sunspotarea, main='')
+```
+It makes sense to log-transform because:
+* The regular plot contains a lot of data for $0 <= y <= 1000$ and relatively few data points in $1000 <= y <= 3000$. This indiciates some skewedness.
+* The indicated skewedness is further supported by the histogram which shows a right-skewedness.
+Having this right-skewedness in the data requires a log transformation.
+
+## b) 
+Choose a suitable AR-model only based on the first 100 observations (1875 - 1974) of the log-transformed series.
+```{r}
+subset.log.sunspotarea <- window(log(sunspotarea), start = 1875, end = 1974)
+tsdisplay(subset.log.sunspotarea)
+```
+Given the ACF plot (damped sinusoid) and the PACF plot, multiple model might be suitable - AR(2), AR(9), AR(10). Let's see if we can find supporting evidence for them.
+```{r}
+fit.ar <- ar(subset.log.sunspotarea, method = "burg")
+plot(0:fit.ar$order.max, fit.ar$aic, type='l')
+```
+Again, here we can see some kinks in indexes 2, 9 and 10. 10 has the lowest AR score, which would make it a great candidate for our model order.
+Let's verify with the different model fits.
+
+### AR(2)
+```{r}
+fit.ar.2 <- arima(subset.log.sunspotarea, order = c(2, 0, 0))
+tsdisplay(fit.ar.2$residuals)
+```
+There is still some dependency in the ACF/PACF plots.
+### AR(9)
+```{r}
+fit.ar.9 <- arima(subset.log.sunspotarea, order = c(9, 0, 0))
+tsdisplay(fit.ar.9$residuals)
+```
+This looks a lot better than AR(2).
+
+### AR(10)
+```{r}
+fit.ar.10 <- arima(subset.log.sunspotarea, order = c(10, 0, 0))
+tsdisplay(fit.ar.10$residuals)
+```
+This seems to be far more superior to all the other tested models, since we do not have any dependency present between the lags.
+
+
+# Exercise 7.3
+During their yearly spring melt, glaciers deposit layers of sand and mud. These annu- al sediments, known as varves, can be reconstructed in New England for the whole time between the beginning (about 12’600 years ago) till the end (6’000 years ago) of glacial retreat. From these varves, approximations of paleoclimatic parameters can be computed, such as temperature (a warmer year yields more sediment).
+
+In the dataset varve.dat, you will find 350 annual sediment diameters (contained in lines 201 through 550) starting at 11’660 years ago. After loading these data, first con- struct a time series object from them:
+```{r}
+t.url <- "http://stat.ethz.ch/Teaching/Datasets/WBL/varve.dat" 
+d.varve <- ts(scan(t.url)[201:550])
+```
+Comment: The procedure scan() is a more general data loading function than read.table(). We use it here to avoid putting the data into a data frame. Do not worry about the exact choice of procedure for reading data here: simply believe us when we say that scan() does what we need, or read the help file.
+
+## a)
+It is advisable to log-transform the time series. Why?
+```{r}
+par(mfrow=c(1,2))
+plot(d.varve)
+hist(d.varve, main='')
+```
+It makes sense to log-transform because:
+* The regular plot contains a lot of data for $0 <= y <= 75$ and relatively few data points in $75 <= y <= 150$. This indiciates some skewedness.
+* The indicated skewedness is further supported by the histogram which shows a right-skewedness.
+Having this right-skewedness in the data requires a log transformation.
+
+## b)
+Is the log-transformed timeseries stationary? If not, how can you make this time series stationary?
+```{r}
+log.d.varve <- log(d.varve)
+plot(log.d.varve)
+```
+
+The timeseries does not seem to be stationary, as there is a clear trend visible (increase at first and then a decrease, with a peak around $x=230$). To make it stationary, we can take differences.
+```{r}
+diff.log.d.varve <- diff(log.d.varve)
+plot(diff.log.d.varve)
+```
+This looks a lot better, since the trend is now gone. We can validate this by looking at the individual (P)ACF plots.
+```{r}
+tsdisplay(log.d.varve)
+```
+Again, we can see a slow decay in the ACF plot, which indicates a present trend.
+```{r}
+tsdisplay(diff.log.d.varve)
+```
+The ACF plot on the first differenced timeseries has a really quick decay (significant drop after 1 lag), which indicates stationarity.
