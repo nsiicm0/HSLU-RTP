@@ -1,0 +1,96 @@
+---
+title: "Exercise 8"
+author: "Niclas Simmler"
+date: "09.04.20"
+output:
+  html_document:
+    df_print: paged
+---
+```{r include=FALSE}
+library(forecast)
+library(nlme)
+```
+
+# Exercise 8.1
+Have not looked at ARIMA yet.
+
+# Exercise 8.2
+
+There is a study on the development of beluga whales that focusses on the nursing behaviour of mother and calf. During a total of 160 time periods (each lasting 6 hours) subsequent to birth, the following variables were observed for Hudson, a beluga calf. Zoologists use this data to ascertain the health of this young whale. 
+A nursing bout is defined as a successful nursing episode where milk was obtained. We would like to model the nursing time by means of the other variables. Count variables have already undergone a square root transformation to stabilize their va- riance (first-aid-transformation). You will find the data in the file beluga.dat. Load the data in the usual way and create a time series matrix:
+```{r}
+d.beluga <- read.table("http://stat.ethz.ch/Teaching/Datasets/WBL/beluga.dat", header = TRUE)
+d.beluga <- ts(d.beluga)
+```
+
+## a)
+Fit the model $NURSING = \beta_0 + \beta_1 PERIOD + \beta_2 BOUTS + \beta_3 LOCKONS + \beta_4 DAYNIGHT$ using ordinary linear regression. Check the independence of the residuals. What conclusions can zoologists draw from this analysis?
+
+```{r}
+olm.fit <- lm(NURSING ~ ., data = d.beluga)
+summary(olm.fit)
+tsdisplay(residuals(olm.fit))
+```
+There is still a slight trend visible in the residuals. This could indicate that there are some other structures still hidden. This is also supported by the relatively slowly decaying ACF plot. Also the PACF plot shows some dependencies towards other lags. This also means that the output of $lm$ can be highly inaccurate. Zoologists cannot draw any conclusions from the output. 
+
+## b)
+Due to the correlations involved, an AR(p) model should be assumed for the residuals. Determine the order p of this model, and estimate the parameters
+```{r}
+ar.burg <- ar(residuals(olm.fit), method = "burg")
+plot(0:ar.burg$order.max, ar.burg$aic, type='o')
+```
+It seems that $p=2$ is a good option, since this one shows a substantially kink in the line.
+
+## c)
+Estimate the regression coefficients and the AR parameters using Generalized Least Squares with Maximum Likelihood estimation. 
+To ensure convergence of the algorithm, known estimates of the AR parameters can be passed to corARMA() as starting values using the optional argument values. In this particular case, this does not change the outcome.(correlation = corARMA(..., value = r.burg$ar, ...))
+```{r}
+r.bel.gls <- gls(NURSING ~ ., data = d.beluga, correlation = corARMA(form= ~ PERIOD, p = ar.burg$order, q = 0, fixed=FALSE), method = "ML")
+
+summary(r.bel.gls)
+d.resid <- ts(resid(r.bel.gls))
+
+tsdisplay(d.resid)
+```
+From the output of gls, we can infer the $\alpha_1$ parameter to be $0.274$ and the $\alpha_2$ parameter to be $0.365$. 
+
+# Exercise 8.3
+With the new material in the course we would like to return to Exercise 7.3.
+
+```{r}
+t.url <- "http://stat.ethz.ch/Teaching/Datasets/WBL/varve.dat" 
+d.varve <- ts(scan(t.url)[201:550])
+```
+
+
+## a)
+Choose a suitable model that fits the data. Does your model fit? Analyze the residuals and comment on your decision.
+
+```{r}
+tsdisplay(diff(log(d.varve))) # The timeseries is now stationary and log transformed
+```
+Looking at the (P)ACF plots, I would model this dataset as an $ARIMA(1,1,1)$ process ($I=1$ because we applied $diff$ once).
+```{r}
+r.varve <- arima(log(d.varve), order = c(1, 1, 1))
+tsdisplay(residuals(r.varve))
+qqnorm(residuals(r.varve))
+qqline(residuals(r.varve))
+```
+This looks really good, since no structure is present anymore in the residuals. We can also see from the QQ-Plot, that all points follow the line really closely, so no real outliers detected there.
+
+## b)
+Write down the model you chose in a) with its estimated coefficients.
+```{r}
+r.varve$coef
+r.varve$sigma2
+```
+
+The model looks as follows:
+
+$$
+Y_t = 0.25 * Y_{t-1} + E_t - 0.91 * E_{t-1}
+$$
+with
+$$
+\sigma^2_{E_t} = 0.214
+$$
