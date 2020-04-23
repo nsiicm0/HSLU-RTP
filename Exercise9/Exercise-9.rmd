@@ -1,0 +1,122 @@
+---
+title: "Exercise 9"
+author: "Niclas Simmler"
+date: "23.04.20"
+output:
+  html_document:
+    df_print: paged
+---
+```{r include=FALSE}
+library(forecast)
+library(astsa)
+```
+
+# Exercise 9.1
+In this exercise, we look at the time series **prodn**, which is available in the package **astsa**. It contains monthly data about the Federal Reserve Board Production Index from 1948-1978, in total the time series contains data for $n = 372$ months.
+
+## a)
+
+> Plot the time series. What kind of non-stationarity is evident?
+
+```{r}
+n <- length(prodn)
+plot(prodn, panel.first = grid(nx = n/12, ny = 0))
+```
+
+The timeseries seems to have a linear trend present. There might also be an annual seasonal aspect present when we look at the last five years.
+
+## b)
+
+> How can the time series be made stationary?
+
+```{r}
+prodn.no.season <- diff(prodn, lag=12)
+plot(prodn.no.season)
+```
+
+First we will try to remove the seasonality. We assume that there is an annual seasonal aspect, so we will difference with lag 12.
+The plot looks good, but there might still be some residuals of a linear trend present. We can check this by looking at a smoothed line for instance produced by a loess smoother.
+
+```{r}
+x <- time(prodn.no.season)
+lf <- loess(prodn.no.season ~ x)
+y <- fitted(lf)
+plot(prodn.no.season)
+lines(as.numeric(x), y, col='blue')
+```
+We can still tell a slight trend visible in the data by looking at the smoothed line. Let's try to remove this one.
+```{r}
+prodn.stationary <- diff(prodn.no.season)
+plot(prodn.stationary)
+```
+This looks much better now. We can verify this again by looking at the filter.
+```{r}
+x <- time(prodn.stationary)
+lf <- loess(prodn.stationary ~ x)
+y <- fitted(lf)
+plot(prodn.stationary)
+lines(as.numeric(x), y, col='blue')
+```
+Now the smoothed line is almost straight. This is good.
+So we got to the current state by using the following modifications:
+
+* First take the difference using lag 12
+* Then take the difference using lag 1
+
+## c)
+
+> Based on your considerations in b), what kind of model would you fit to the original time series **prodn**? Try different fits and choose your favourite.
+
+Firstly it needs to be said, that a SARIMA model is suitable, since we used a differencing operation with lag 12 to remove seasonality and a differencing operation with lag 1 to remove the trend. This will give us a SARIMA model with $s=12$, $D=1$ and $d=1$.
+Next we will look at the (P)ACF plots to see whether we can recognize any parameters for p,q and P,Q.
+
+```{r}
+tsdisplay(prodn.stationary)
+```
+
+*P,Q* can be determined by looking at the lags which are a multiple of $s=12$. In our case this would be lag 12, 24, 36. Looking at the PACF plot, we can see a sharp drop after lag 24, hence giving us a value of 2 for P. Same goes for the sharp drop after lag 12 in the ACF plot, which gives us the value 1 for Q.
+Therefore we have our model parameters for the seasonal part with $(P,D,Q) \to (2,1,1)$
+
+*p,q* can be determined by looking at the smaller lags. In our case these will most- likely be within the first 5 lags of each plot. From the plots we can tell various candidates, this is due to the fact that we could have AR, MA or ARMA models. For an AR(p,0) model we would test $(1,0)$ and $(2,0)$ (see significant drops in PACF), whereas for an MA(0,q) model we would test $(0,2)$ nad $(0,4)$ (see only significant drops at lag 2 and 4 in ACF plot). For the ARMA(p,q) models we would thus test the combination of all of them: $(1,0)$, $(1,2)$, $(1,4)$, $(2,0)$, $(2,2)$, $(0,2)$, $(0,4)$ and $(2,4)$. In order to compare the model performances, we will use the AIC criterium.
+
+```{r}
+ps <- c(0,1,2)
+qs <- c(0,2,4)
+d <- 1
+D <- 1
+P <- 2
+Q <- 1
+aics <- c()
+for(p in ps){
+  for(q in qs){
+    fit <- arima(prodn, order = c(p,d,q), seasonal = c(P,D,Q))
+    cat(cat('p=',p,sep=''),cat(', q=',q,sep=''),cat(', AIC=',fit$aic,sep=''),sep='\n')
+  }
+}
+```
+It looks like that the following model performs best: $SARIMA(0,1,4)(2,1,1)^{12}$ with an AIC of $1145.407$.
+Let's have a look at the fit.
+```{r}
+fit <- arima(prodn, order = c(0,1,4), seasonal = c(2,1,1))
+tsdisplay(fit$residuals)
+```
+
+The residuals look fine. There is a slight dependency in the lag (P)ACF plots at lag 14, but this can be overlooked.
+The next best model is $SARIMA(2,1,0)(2,1,1)^{12}$ with an AIC of $1147.974$. This model is obviously much simpler than the other one (lower sum of p and q).
+
+```{r}
+fit <- arima(prodn, order = c(2,1,0), seasonal = c(2,1,1))
+tsdisplay(fit$residuals)
+```
+This also looks good. Again we have a slight dependency in the lags, but this can be overlooked.
+I would pick either of the two models, but would favor the simpler one as the more complex one might overfit.
+
+We can verify our result using auto.arima.
+```{r}
+fit.auto <- auto.arima(prodn, ic = 'aic')
+summary(fit.auto)
+tsdisplay(fit.auto$residuals)
+```
+Interestingly enough, auto.arima would pick a model with a higher AIC and more dependency in the lags. Thus, we would still stick to our previous answer.
+
+
