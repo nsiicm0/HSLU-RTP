@@ -1,0 +1,214 @@
+---
+title: "Exercise 10"
+author: "Niclas Simmler"
+date: "30.04.20"
+output:
+  html_document:
+    df_print: paged
+---
+```{r include=FALSE}
+library(fpp)
+library(forecast)
+```
+
+# Exercise 10.1
+In this exercise we again have a look at the sunspot data (Series 4). We figured out that *AR(10)* is a suitable model to describe the log transformed data.
+```{r}
+lsunspot100 <- window(log(sunspotarea), start = 1875, end = 1974)
+fit.ar10 <- arima(lsunspot100, order = c(10, 0, 0))
+```
+
+
+## a)
+
+> For the AR(10) model, predict the next 100 observations of the log-transformed time series and plot them together with the log-transformed time series. Also add a line for the estimated global mean to the plot. What do you observe?
+
+```{r}
+pred.100 <- predict(fit.ar10, n.ahead = 100)
+plot(lsunspot100, xlim = c(1875, 2074))
+lines(pred.100$pred, col='blue')
+abline(h=fit.ar10$coef['intercept'], lty=2, col='red')
+```
+
+We can see the prediction having a slowly decaying oscillation. The oscillation seems to be converging towards the global mean.
+
+## b)
+
+> Perform an out-of-sample evaluation, i.e. compare your prediction with the last 37 observed values of the time series. Plot the full log-transformed time series (1875 - 2011) and add your prediction (1975 - 2011) as well as prediction in- tervals to the plot and comment on the plot. Also compute the mean squared forecasting error of your prediction:
+$$\frac{1}{k} \displaystyle \sum^{k}_{i=1} (x_{n+i} - \hat{X}_{n+i;1:n})^2$$
+
+```{r}
+lsunspot.full <- log(sunspotarea)
+lsunspot.37 <- window(log(sunspotarea), start = 1975, end = 2011)
+pred.37 <- predict(fit.ar10, n.ahead = 37, return_conf_int=True, alpha=0.05)
+
+plot(lsunspot.full)
+lines(pred.37$pred, col='blue')
+
+lines(pred.37$pred - 2*pred.37$se, type = "l", col = 'magenta', lty = 2)
+lines(pred.37$pred + 2*pred.37$se, type = "l", col = 'magenta', lty = 2)
+
+(pred.mse <- mean((lsunspot.37 - pred.37$pred)^2))
+```
+
+It seems that our prediciton is quite good in terms of the seasonality aspects. However, we underestimate all peaks, which is not so good. We are getting a mean squared forecasting error of 0.756.
+
+# Exercise 10.2
+
+We want to compare methods for forecasting the airplane data: the forecasting using a SARIMA model and the forecasting using an STL-decomposition. For being able to compare the prediction methods with the real data, first read in the airplaine data and use only the observations from 1949 to 1956.
+
+```{r}
+d.air <- AirPassengers
+d.airshort <- window(d.air, end = c(1956, 12))
+```
+
+## a)
+
+> Fit an ARIMA/SARIMA Model for the shorter dataset d.airshort. Use transformations if suitable. Compute a prediction for the years 1957-1960 and plot it along with the prediction interval and the actual observations for this period.
+
+```{r}
+plot(d.air)
+```
+
+The data clearly shows a trend and a seasonality pattern. Let's try to remove the seasonality and trend. We assume that there is an annual seasonal aspect. The trend seems linear so we will diff with lag 1. We will first apply a log-transformation to keep the variance low.
+```{r}
+d.airshort.l <- log(d.airshort)
+par(mfrow=c(2,1))
+d.airshort.l.ns <- diff(d.airshort.l, lag=12)
+plot(d.airshort.l.ns)
+
+d.airshort.l.ns.nt <- diff(d.airshort.l.ns, lag=1)
+plot(d.airshort.l.ns.nt)
+
+```
+
+This looks good in terms of stationarity. Let's try to find the model.
+
+```{r}
+tsdisplay(d.airshort.l.ns.nt, points = FALSE)
+```
+
+So we already know $s = 12$, $d = 1$ and $D = 1$ (annual seasonality). By looking at PACF plot we can determine P as 1 (since we have a high dependency with a steep drop on lag 12 -> hint P*s). Also we can infer p as 1 (see steep drop at lag 1). Applying the same reasoning on the ACF plot, we can find parameters for Q and q. Our model seems to be $SARIMA(1,1,1)(1,1,1)^{12}$.
+```{r}
+sarima.airshort <- arima(d.airshort.l, order=c(1,1,1), seasonal=c(1,1,1))
+sarima.airshort
+tsdisplay(sarima.airshort$residuals)
+```
+
+The model seems to look really good (no real patterns recognizeable in tsdisplay). We will use it for predictions.
+```{r}
+airshort.predictions <- predict(sarima.airshort, n.ahead=48, return_conf_int=True, alpha=0.05) # we will predict 4 years
+
+plot(log(d.air), xlim = c(1950, 1961), ylim = c(4.5, 7)) # we also need to apply log transformation here
+lines(airshort.predictions$pred, col='blue')
+
+lines(airshort.predictions$pred - 2*airshort.predictions$se, type = "l", col = 'magenta', lty = 2)
+lines(airshort.predictions$pred + 2*airshort.predictions$se, type = "l", col = 'magenta', lty = 2)
+
+```
+
+The model seems to predict really good. It seems that it is sligthly overestimating but this is fine.
+
+## b)
+
+> Now do prediction for the years 1957-1960 as seen in the lecture with linear extraploation of the trend estimate, continuation of the seasonal effect and and ARMA(p,q) forecast for the stationary remainder. Plot the predicted timeseries (this time without prediction interval, why?) and compare them to the actual observations.
+
+Let's extrapolate the trend. First we need to extract the trend using stl from the data.
+```{r}
+# Extract trend from the data
+fit <- stl(d.airshort.l, s.window = "periodic") 
+d.airshort.trend <- fit$time.series[, 2]
+plot(d.airshort.l)
+lines(d.airshort.trend, col='green')
+```
+
+This looks good. Next we need to fit a regression line to the extracted trend.
+
+```{r}
+plot(d.airshort.l)
+lines(d.airshort.trend, col='green')
+# Find regression line on the trend
+y <- window(d.airshort.trend, start = c(1953, 1)) # grab last 4 years
+x <- time(y)
+regression <- lm(y ~ x) # least square regression using the last 4 years.
+
+abline(regression, col='red')
+```
+
+The regression line (red), seems to look ok-ish. Let's extrapolate the next years. We will extrapolate the next 4 years (k).
+
+```{r}
+months <- 48
+d.airshort.trend.extrapolated <- rev(d.airshort.trend)[1] + ((1:months) / 12) * coef(regression)[2]
+```
+
+Next we will need to extract the seasonal effect.
+```{r}
+d.airshort.seasonality <- fit$time.series[, 1]
+
+d.airshort.seasonality.window <- window(d.airshort.seasonality, start = c(1953, 1)) # we take the last 4 years
+
+# we construct a new timeseries using the seasonality for the 4 years to predict.
+d.airshort.seasonality.extrapolated <- ts(d.airshort.seasonality.window, start = c(1957, 1), end = c(1960, 12), frequency = 12) 
+
+plot(d.airshort.seasonality.extrapolated)
+```
+
+We now have the basic components for the timeseries. We will now try to find a model that fits the remainder so we can use it for forecasting the 4 years.
+
+```{r}
+d.airshort.remainder <- fit$time.series[, 3]
+tsdisplay(d.airshort.remainder, points = FALSE)
+```
+
+We have multiple options here. It could be an AR(1) or AR(3) model (fast decay and damped sinusoid in ACF plot).
+Let's look at both.
+```{r}
+fit.remainder.1 <- arima(d.airshort.remainder, order=c(1,0,0))
+tsdisplay(residuals(fit.remainder.1), points=FALSE)
+fit.remainder.3 <- arima(d.airshort.remainder, order=c(3,0,0))
+tsdisplay(residuals(fit.remainder.3), points=FALSE)
+```
+
+By looking at the (P)ACF plots, we can still see some dependencies present in the lags for AR(1). So we will go with the AR(3) model.
+Let's predict 4 years for the remainder.
+```{r}
+pred.remainder <- predict(fit.remainder.3, n.ahead=48)
+d.airshort.remainder.extrapolated <- pred.remainder$pred
+```
+
+Now we can finally construct our timeseries.
+```{r}
+ts.extrapolated <- d.airshort.trend.extrapolated + d.airshort.seasonality.extrapolated + d.airshort.remainder.extrapolated
+
+plot(log(d.air), xlim = c(1950, 1961), ylim = c(4.5, 7)) 
+lines(ts.extrapolated, col='blue')
+```
+
+The prediction looks good. But let's see when we compare them.
+
+## c)
+
+> Compare the different forecasts. Which of the methods seems to work best for the airplane data and why?
+
+We will overlay the different forecasts in order to better compare them.
+```{r}
+plot(log(d.air), xlim = c(1954, 1961), ylim = c(4.5, 7)) # we also need to apply log transformation here
+lines(airshort.predictions$pred, col='blue', lwd=2)
+lines(ts.extrapolated, col='green', lty=2, lwd=2)
+legend(1954, 7,legend=c('Data', 'SARIMA', 'STL'), col=c('black', 'blue', 'green'), lty=c(1,1,2), cex=0.8, box.lty=0)
+```
+
+Both methods seem to predict the first year really good. The further we predict, the more the modesl seem to overestimate.
+```{r}
+forecasted.data.range <- window(log(d.air), start = c(1957,1), end = c(1960, 12))
+# SARIMA MSFE
+mean((forecasted.data.range - airshort.predictions$pred)^2)
+
+# STL MSFE
+mean((forecasted.data.range - ts.extrapolated)^2)
+```
+By looking at the mean squared forecasting error, we can see that both methods perform almost similar. However, the SARIMA model is slighlty better.
+
+
+
